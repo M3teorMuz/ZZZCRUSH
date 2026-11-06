@@ -1,0 +1,53 @@
+name: Build ZCRUSH VST3 (Windows)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build VST3 / Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out ZCRUSH
+        uses: actions/checkout@v4
+
+      - name: Show toolchain versions
+        shell: pwsh
+        run: |
+          cmake --version
+          git --version
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build (Release)
+        shell: pwsh
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Verify VST3 bundle
+        shell: pwsh
+        run: |
+          $plugin = "build/ZCRUSH_artefacts/Release/VST3/ZCRUSH.vst3"
+          if (-not (Test-Path $plugin)) {
+            Write-Error "VST3 bundle was not created at: $plugin"
+            Get-ChildItem -Path build -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+            exit 1
+          }
+          Write-Host "Found VST3 bundle: $plugin"
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZCRUSH-VST3-Windows-x64
+          path: build/ZCRUSH_artefacts/Release/VST3/ZCRUSH.vst3
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 14
